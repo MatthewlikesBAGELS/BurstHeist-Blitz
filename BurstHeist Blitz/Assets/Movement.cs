@@ -15,6 +15,15 @@ public class Movement : MonoBehaviour
     [Space(10)]
     public float frictionAmount;
 
+    [Header("Sprint")]
+    [Tooltip("Must be HIGHER than Move Speed")]
+    public float sprintSpeed;
+    [Tooltip("Speed to add to Move Speed every second")]
+    public float speedAdded;
+
+    float originalSpeed;
+    bool isSprinting = false;
+
     [Header("Jump")]
     public float jumpForce;
     [Range(0, 1)]
@@ -59,6 +68,7 @@ public class Movement : MonoBehaviour
 
     public float dashInputCooldown = 0.15f;
     float dashInputTimer;
+    bool canDash = false;
 
     [Header("Checks")]
     public Transform groundCheck;
@@ -79,6 +89,7 @@ public class Movement : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         dashInputTimer = dashInputCooldown;
         wallJumpTimer = wallJumpCooldown;
+        originalSpeed = moveSpeed;
     }
 
     private void FixedUpdate()
@@ -114,6 +125,33 @@ public class Movement : MonoBehaviour
         rb.AddForce(movement * Vector2.right);
         #endregion
 
+        #region Sprinting
+        if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.LeftControl))
+        {
+            isSprinting = true;
+        }
+        else
+        {
+            isSprinting = false;
+        }
+        
+        if (rb.velocity.x == 0f)
+        {
+            moveSpeed = originalSpeed;
+            canDash = true;
+        }
+
+        if (isSprinting)
+        {
+            if (moveSpeed < sprintSpeed && rb.velocity.x != 0f)
+            {
+                moveSpeed += Time.deltaTime * speedAdded;
+                canDash = false;
+            }
+            else return;
+        }
+        #endregion
+
         #region Friction
         if (lastGroundedTime > 0 && Mathf.Abs(moveInput) < 0.01f)
         {
@@ -135,12 +173,15 @@ public class Movement : MonoBehaviour
         if (Physics2D.OverlapBox(wallCheck.position, wallCheckSize, 0, wallLayer) && lastGroundedTime <= 0 && wallJumpTimer <= 0)
         {
             canWallJump = true;
-            rb.gravityScale = gravityScale * wallSlideMultiplier;
+            if(rb.velocity.y < 0f)
+            {
+                rb.velocity = new Vector2(rb.velocity.x, rb.velocity.y * wallSlideMultiplier);
+            }
         }
-
-        if (!Physics2D.OverlapBox(wallCheck.position, wallCheckSize, 0, wallLayer))
+        else
         {
             canWallJump = false;
+            rb.gravityScale = gravityScale;
         }
         #endregion
 
@@ -178,7 +219,7 @@ public class Movement : MonoBehaviour
         #endregion
 
         #region Gun Fire Input
-        if (gun != null && Input.GetMouseButtonDown(0) && availableDashes > 0 && dashInputTimer <= 0f)
+        if (gun != null && Input.GetMouseButtonDown(0) && availableDashes > 0 && dashInputTimer <= 0f && canDash)
         {
             Dash();
         }
